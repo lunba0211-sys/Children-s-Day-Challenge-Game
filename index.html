@@ -1,1 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>兒童節情緒對對碰 - 闖關大冒險</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .card {
+            perspective: 1000px;
+            height: 120px;
+            cursor: pointer;
+        }
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+        }
+        .card.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+        .card-front, .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            font-size: 2.5rem;
+        }
+        .card-front {
+            background: linear-gradient(135deg, #A78BFA 0%, #6366F1 100%);
+            color: white;
+        }
+        .card-back {
+            background-color: white;
+            transform: rotateY(180deg);
+            border: 4px solid #FDE047;
+        }
+        .matched {
+            opacity: 0.6;
+            cursor: default;
+        }
+    </style>
+</head>
+<body class="bg-indigo-50 min-h-screen flex flex-col items-center p-4 font-sans">
 
+    <!-- 標題區 -->
+    <header class="text-center my-6">
+        <h1 class="text-3xl font-bold text-indigo-600 mb-2">🎉 兒童節情緒闖關遊戲 🎁</h1>
+        <p class="text-gray-600">配對成功後，請選出最合適的情緒處理方式！</p>
+    </header>
+
+    <!-- 遊戲資訊 -->
+    <div class="flex gap-8 mb-6 text-lg font-semibold text-indigo-800">
+        <span>已完成配對: <span id="match-count">0</span> / 6</span>
+    </div>
+
+    <!-- 遊戲卡牌區 -->
+    <div id="game-board" class="grid grid-cols-3 md:grid-cols-4 gap-4 w-full max-w-2xl">
+        <!-- 卡牌由 JS 生成 -->
+    </div>
+
+    <!-- 彈出題目視窗 -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <h2 id="modal-title" class="text-2xl font-bold text-orange-500 mb-4">💡 情緒挑戰時刻</h2>
+            <p id="modal-question" class="text-gray-700 text-lg mb-6 leading-relaxed"></p>
+            <div id="modal-options" class="space-y-3">
+                <!-- 選項由 JS 生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 勝利視窗 -->
+    <div id="win-screen" class="fixed inset-0 bg-indigo-600 bg-opacity-95 hidden flex flex-col items-center justify-center text-white p-4 z-[60]">
+        <div class="text-8xl mb-4">🏆🏆🏆</div>
+        <h2 class="text-4xl font-bold mb-4">恭喜闖關成功！</h2>
+        <p class="text-xl mb-8 text-center px-4">太棒了！你已經掌握了處理各種情緒的小秘訣囉！</p>
+        <button onclick="location.reload()" class="bg-white text-indigo-600 px-8 py-3 rounded-full font-bold text-lg hover:bg-yellow-300 transition-colors">
+            再玩一次
+        </button>
+    </div>
+
+    <script>
+        const cardData = [
+            { id: 1, icon: '😨', q: '當你在學校考不好，心情受影響，可以怎麼做？', options: ['找一件開心的事，例如：運動', '先調適心情，再想辦法努力', '找爸媽、同學或老師幫忙'], correct: 0 },
+            { id: 2, icon: '😡', q: '玩鬼抓人跟同學吵架，覺得心裡快要爆炸了？', options: ['停下來、深呼吸，想辦法冷靜', '先離開現場', '找老師幫忙'], correct: 0 },
+            { id: 3, icon: '😟', q: '下課時想跟同學玩，但同學不想玩，你覺得心裡酸酸的...', options: ['問同學那想玩什麼？', '找其他人玩', '請老師幫忙'], correct: 0 },
+            { id: 4, icon: '😄', q: '打球比賽獲勝了很開心，可以怎麼做？', options: ['感謝老師教練指導', '跟朋友分享', '獎勵自己'], correct: 0 },
+            { id: 5, icon: '🤔', q: '同學邀請自己一起說謊騙大人，可以怎麼做？', options: ['找個理由離開', '跟老師說', '告訴朋友自己很害怕'], correct: 0 },
+            { id: 6, icon: '☹️', q: '被同學取綽號，還一直講，可以怎麼做？', options: ['請老師處理', '告訴爸爸、媽媽', '勇敢告訴同學自己不喜歡這樣被叫'], correct: 0 }
+        ];
+
+        let cards = [...cardData, ...cardData];
+        let flippedCards = [];
+        let matchedCount = 0;
+        let isLocked = false;
+
+        // 隨機洗牌
+        cards.sort(() => Math.random() - 0.5);
+
+        const board = document.getElementById('game-board');
+
+        function createBoard() {
+            board.innerHTML = '';
+            cards.forEach((data, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.id = data.id;
+                card.dataset.index = index;
+                card.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-front">?</div>
+                        <div class="card-back">${data.icon}</div>
+                    </div>
+                `;
+                card.addEventListener('click', flipCard);
+                board.appendChild(card);
+            });
+        }
+
+        function flipCard() {
+            if (isLocked) return;
+            if (this.classList.contains('flipped') || this.classList.contains('matched')) return;
+
+            this.classList.add('flipped');
+            flippedCards.push(this);
+
+            if (flippedCards.length === 2) {
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            isLocked = true;
+            const [card1, card2] = flippedCards;
+
+            if (card1.dataset.id === card2.dataset.id) {
+                setTimeout(() => {
+                    showQuestion(card1.dataset.id);
+                }, 500);
+            } else {
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                    flippedCards = [];
+                    isLocked = false;
+                }, 1000);
+            }
+        }
+
+        function showQuestion(id) {
+            const data = cardData.find(item => item.id == id);
+            const modal = document.getElementById('modal');
+            const questionText = document.getElementById('modal-question');
+            const optionsDiv = document.getElementById('modal-options');
+
+            questionText.innerText = data.q;
+            optionsDiv.innerHTML = '';
+
+            data.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-4 border-2 border-indigo-100 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 transition-all font-medium";
+                btn.innerText = opt;
+                btn.onclick = (e) => handleAnswer(idx, data.correct, e);
+                optionsDiv.appendChild(btn);
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        function handleAnswer(selected, correct, event) {
+            const modal = document.getElementById('modal');
+            modal.classList.add('hidden');
+            
+            flippedCards.forEach(card => card.classList.add('matched'));
+            flippedCards = [];
+            matchedCount++;
+            document.getElementById('match-count').innerText = matchedCount;
+            isLocked = false;
+
+            if (matchedCount === 6) {
+                setTimeout(() => {
+                    document.getElementById('win-screen').classList.remove('hidden');
+                }, 500);
+            }
+        }
+
+        window.onload = createBoard;
+    </script>
+</body>
+</html>
